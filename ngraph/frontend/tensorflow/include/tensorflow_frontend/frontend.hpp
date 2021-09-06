@@ -58,7 +58,7 @@ protected:
             // The case when folder with __model__ and weight files is provided or .pdmodel file
             if (ov::is_type<VariantWrapper<std::string>>(variants[0])) {
                 std::string m_path = ov::as_type_ptr<VariantWrapper<std::string>>(variants[0])->get();
-                return std::make_shared<InputModelTensorflow>(m_path);
+                return std::make_shared<InputModelTF>(m_path);
             }
         }
         return nullptr;

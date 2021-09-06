@@ -22,6 +22,8 @@
 #include "node_context_impl.hpp"
 #include "tensor.pb.h"
 
+#include <tensorflow_frontend/place.hpp>
+
 namespace ngraph {
 namespace frontend {
 namespace tensorflow {
@@ -214,6 +216,19 @@ NodeContext::NodeContext(const OutputVector& _ng_inputs,
       m_decoder(_decoder),
       m_overridden_shapes(overridden_shapes),
       m_indexed_shapes(indexed_shapes) {}
+
+NodeContext::NodeContext(const OutputVector& _ng_inputs,
+        std::shared_ptr<detail::TFNodeDecoder> _decoder,
+                         const std::map<std::string, std::shared_ptr<TensorPlaceTF>>& var_places_map)
+    : m_indexed_shapes {} {
+    m_ng_inputs = _ng_inputs;
+    m_decoder = _decoder;
+
+    for (auto item : var_places_map) {
+        m_overridden_shapes[item.first] = item.second->get_partial_shape();
+    }
+}
+
 
 size_t NodeContext::get_ng_input_size() const {
     return m_ng_inputs.size();

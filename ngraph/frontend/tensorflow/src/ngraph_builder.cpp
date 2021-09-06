@@ -2710,7 +2710,7 @@ static std::map<const string, const function<ngraph::OutputVector(const NodeCont
 };
 
 void Builder::TranslateGraph(
-    std::shared_ptr<ngraph::frontend::InputModelTensorflow> tf_model,
+    std::shared_ptr<ngraph::frontend::InputModelTF> tf_model,
     const std::vector<const ngraph::frontend::tensorflow::detail::TensorWrapper*>& static_input_map,
     const std::string name,
     std::shared_ptr<ngraph::Function>& ng_function) {
@@ -2724,8 +2724,8 @@ void Builder::TranslateGraph(
     ngraph::ResultVector results;
 
     const auto& ops = tf_model->get_op_places();
-    const auto& inputs = tf_model->partialShapes;
-    const auto& indexed_shapes = tf_model->input_shapes;
+    const auto& inputs = tf_model->get_var_places();
+    //const auto& indexed_shapes = tf_model->input_shapes;
 
     //
     // Now create the nGraph ops from TensorFlow ops.
@@ -2780,7 +2780,8 @@ void Builder::TranslateGraph(
                     throw;
                 }
             }
-            NodeContext node_context(ng_inputs, op, inputs, indexed_shapes);
+            //NodeContext node_context(ng_inputs, op, inputs, indexed_shapes);
+            NodeContext node_context(ng_inputs, op, inputs);
 
             // Next line does the conversion for a node by means of calling specific conversion rule
             auto outputs = (*op_fun)(node_context);
