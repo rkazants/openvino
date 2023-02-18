@@ -40,9 +40,9 @@ public:
 
         // TODO: Move to cpp file
 
-        set_output_type(0, element::i64, PartialShape{Dimension(), Dimension(2)});
+        set_output_type(0, element::i32, PartialShape{Dimension(), Dimension(2)});
         set_output_type(1, element::i32, PartialShape{Dimension()});
-        set_output_type(2, element::i64, PartialShape{2});
+        set_output_type(2, element::i32, PartialShape{2});
     }
 
     std::shared_ptr<ov::Node> clone_with_new_inputs(const OutputVector& inputs) const override {
