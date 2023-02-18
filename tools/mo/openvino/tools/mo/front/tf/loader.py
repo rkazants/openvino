@@ -196,9 +196,6 @@ def freeze_tf2_concrete_function(model, concrete_func, env_setup):
 
     inputs_outputs_order = (input_names, output_names)
 
-    with open('/home/slyalin/graph_def.txt', 'w') as file:
-        print(concrete_func.graph.as_graph_def(add_shapes=True), file=file)
-
     return graph_def, {}, 'tf2', inputs_outputs_order
 
 
