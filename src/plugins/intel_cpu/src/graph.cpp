@@ -1078,6 +1078,9 @@ void Graph::InferDynamic(InferRequestBase* request) {
     std::function<void(size_t, size_t)> updateDynParams;
 
     updateShapes = [&](size_t node_indx, size_t stop_indx) {
+        if (node_indx >= stop_indx) {
+            return;
+        }
         const auto& node = executableGraphNodes[node_indx];
         prepareCounter.store(node_indx);
         if (node_indx >= stop_indx) {

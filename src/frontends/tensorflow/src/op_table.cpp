@@ -24,8 +24,13 @@ using std::make_shared;
 
 TF_OP_CONVERTER(translate_if_op);
 TF_OP_CONVERTER(translate_block_lstm_op);
+TF_OP_CONVERTER(translate_fifo_queue_op);
 TF_OP_CONVERTER(translate_gru_block_cell_op);
 TF_OP_CONVERTER(translate_partitioned_call_op);
+TF_OP_CONVERTER(translate_iterator_get_next_op);
+TF_OP_CONVERTER(translate_iterator_op);
+TF_OP_CONVERTER(translate_queue_dequeue_op);
+TF_OP_CONVERTER(translate_queue_dequeue_many_op);
 TF_OP_CONVERTER(translate_sparse_fill_empty_rows_op);
 TF_OP_CONVERTER(translate_sparse_reshape_op);
 TF_OP_CONVERTER(translate_sparse_segment_sum_op);
@@ -141,6 +146,8 @@ const std::map<std::string, CreatorFunction> get_supported_ops() {
         {"ExtractImagePatches", translate_extract_image_patches_op},
         {"FakeQuantWithMinMaxVars", translate_fake_quant_op},
         {"FakeQuantWithMinMaxVarsPerChannel", translate_fake_quant_op},
+        {"FIFOQueue", translate_fifo_queue_op},
+        {"FIFOQueueV2", translate_fifo_queue_op},
         {"Fill", translate_fill_op},
         {"FloorDiv", translate_floor_div_op},
         {"FusedBatchNorm", translate_fused_batch_norm_op},
@@ -152,6 +159,8 @@ const std::map<std::string, CreatorFunction> get_supported_ops() {
         {"Identity", translate_identity_op},
         {"IdentityN", translate_identity_n_op},
         {"If", translate_if_op},
+        {"Iterator", translate_iterator_op},
+        {"IteratorGetNext", translate_iterator_get_next_op},
         {"input_arg", translate_input_arg_op},
         {"output_arg", translate_output_arg_op},
         {"L2Loss", translate_l2_loss_op},
@@ -178,6 +187,10 @@ const std::map<std::string, CreatorFunction> get_supported_ops() {
         {"Pack", translate_pack_op},
         {"Pad", translate_pad_op},
         {"PadV2", translate_padv2_op},
+        {"QueueDequeue", translate_queue_dequeue_op},
+        {"QueueDequeueV2", translate_queue_dequeue_op},
+        {"QueueDequeueUpTo", translate_queue_dequeue_many_op},
+        {"QueueDequeueUpToV2", translate_queue_dequeue_many_op},
         {"DynamicStitch", translate_parallel_dynamic_stitch_op},
         {"ParallelDynamicStitch", translate_parallel_dynamic_stitch_op},
         {"PartitionedCall", translate_partitioned_call_op},
