@@ -13,7 +13,8 @@
 // clang-format off
 #include "openvino/openvino.hpp"
 #include "openvino/pass/serialize.hpp"
-
+#include "openvino/frontend/frontend.hpp"
+#include "openvino/frontend/manager.hpp"
 #include "gna/gna_config.hpp"
 #include "gpu/gpu_config.hpp"
 
@@ -231,10 +232,161 @@ void fuse_mean_scale(ov::preprocess::PrePostProcessor& preproc, const benchmark_
 }
 }  // namespace
 
+
+
+// end_ids does not include
+void get_raw_format_sentences(std::vector<std::string> inputs,
+    std::vector<int32_t>& begin_ids,
+    std::vector<int32_t>& end_ids,
+    std::vector<uint8_t>& data) {
+    int32_t curr_begin_id = 0;
+    //std::vector<uint8_t> vec(inputs.begin(), inputs.end());
+    //data.assign(inputs.begin(), inputs.end());
+    for (auto str : inputs) {
+        data.insert(data.end(), str.begin(), str.end());
+        begin_ids.push_back(curr_begin_id);
+        curr_begin_id += str.length();
+        end_ids.push_back(curr_begin_id);
+    }
+    for (size_t ind = 0; ind < begin_ids.size(); ++ind) {
+        std::cout << begin_ids[ind] << std::endl;
+        std::cout << end_ids[ind] << std::endl;    
+    }
+    std::cout << data.size() << std::endl;
+}
+
+
 /**
  * @brief The entry point of the benchmark application
  */
 int main(int argc, char* argv[]) {
+    ov::frontend::FrontEndManager fem;
+    auto frontEnd = fem.load_by_framework("tf");
+    std::vector<std::string> inputs = {"Write the first sentence", "Translate the second sentence"};
+
+
+    //std::string model_path = "C:\\Users\\rkazants\\Intel\\cvs_tickets\\conversion_with_fw_nodes\\facenet.pb";
+    std::string model_path = "C:\\Users\\rkazants\\Intel\\cvs_tickets\\conversion_with_fw_nodes\\JDCOM\\9000_109ms.pb";
+
+    //std::string model_path = "C:\\Users\\rkazants\\Intel\\cvs_tickets\\CVS-55594_deepfm\\model\\deepfm.pb";
+    //auto input_model = frontEnd->load(model_path);
+    
+    //std::string model_path = "C:\\Users\\rkazants\\Intel\\cvs_issues\\universal-sentence-encoder-multilingual_"
+    //                        "3\\universal-sentence-encoder-multilingual_3.pb";
+
+    
+    auto input_model = frontEnd->load(model_path);
+
+    // --input input_images[1 32 244 1],seq_len[1],output_keep_prob->[1.0],input_keep_prob->[1.0]
+    auto input1_place = input_model->get_place_by_tensor_name("input_images:0");
+    auto input2_place = input_model->get_place_by_tensor_name("seq_len:0");
+    auto input3_place = input_model->get_place_by_tensor_name("output_keep_prob:0");
+    auto input4_place = input_model->get_place_by_tensor_name("input_keep_prob:0");
+    input_model->set_partial_shape(input3_place, ov::PartialShape{1});
+    input_model->set_element_type(input3_place, ov::element::f32);
+    input_model->set_tensor_value(input3_place, std::vector<float>{1.0}.data());
+    input_model->set_partial_shape(input4_place, ov::PartialShape{1});
+    input_model->set_element_type(input4_place, ov::element::f32);
+    input_model->set_tensor_value(input4_place, std::vector<float>{1.0}.data());
+    input_model->override_all_inputs({input1_place, input2_place, input3_place, input4_place});
+    input_model->set_partial_shape(input3_place, ov::PartialShape{1});
+    input_model->set_element_type(input3_place, ov::element::f32);
+    input_model->set_tensor_value(input3_place, std::vector<float>{1.0}.data());
+    input_model->set_partial_shape(input4_place, ov::PartialShape{1});
+    input_model->set_element_type(input4_place, ov::element::f32);
+    input_model->set_tensor_value(input4_place, std::vector<float>{1.0}.data());
+
+    /*
+    auto output1_place = input_model->get_place_by_tensor_name(
+        "StatefulPartitionedCall/text_preprocessor/RaggedToSparse/RaggedTensorToSparse:0");
+    auto output2_place = input_model->get_place_by_tensor_name(
+        "StatefulPartitionedCall/text_preprocessor/RaggedToSparse/RaggedTensorToSparse:1");
+    auto output3_place = input_model->get_place_by_tensor_name(
+        "StatefulPartitionedCall/text_preprocessor/RaggedToSparse/RaggedTensorToSparse:2");
+    input_model->override_all_outputs({output1_place, output2_place, output3_place});
+    */
+    
+    auto ov_model = frontEnd->convert(input_model);
+    //auto ov_model = frontEnd->convert_partially(input_model);
+    for (auto param : ov_model->get_parameters()) {
+        std::cout << param->get_friendly_name() << std::endl;
+        //std::cout << param->get_shape() << std::endl;
+        std::cout << param->get_element_type() << std::endl;
+        //std::cout << param->output(0).get_any_name() << std::endl;   
+    }
+    ov::serialize(ov_model,
+                  "universal-sentence-encoder-multilingual_3.xml",
+                  "universal-sentence-encoder-multilingual_3.bin",
+                  ov::pass::Serialize::Version::IR_V11);
+    ov::Core core;
+    ov::CompiledModel compiled_model = core.compile_model(ov_model, "CPU");
+    ov::InferRequest infer_request = compiled_model.create_infer_request();
+    
+    std::vector<int32_t> begin_ids;
+    std::vector<int32_t> end_ids;
+    std::vector<uint8_t> data;
+
+    // compute input in a raw format
+    get_raw_format_sentences(inputs, begin_ids, end_ids, data);
+    ov::Tensor input_tensor1 = ov::Tensor(ov::element::i32, ov::Shape{begin_ids.size()}, begin_ids.data());
+    ov::Tensor input_tensor2 = ov::Tensor(ov::element::i32, ov::Shape{end_ids.size()}, end_ids.data());
+    ov::Tensor input_tensor3 = ov::Tensor(ov::element::u8, ov::Shape{data.size()}, data.data());
+
+    infer_request.set_input_tensor(0, input_tensor1);
+    infer_request.set_input_tensor(1, input_tensor2);
+    infer_request.set_input_tensor(2, input_tensor3);
+
+    infer_request.infer();
+
+    const ov::Tensor& output_tensor1 = infer_request.get_output_tensor(0);
+    const ov::Tensor& output_tensor2 = infer_request.get_output_tensor(1);
+    const ov::Tensor& output_tensor3 = infer_request.get_output_tensor(2);
+
+    
+    std::cout << "output_tensor1 get_shape = " << output_tensor1.get_shape() << std::endl;
+    auto output1 = output_tensor1.data<int32_t>();
+    for (int ind = 0; ind < output_tensor1.get_size(); ++ind) {
+        std::cout << output1[ind] << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "output_tensor2 get_shape = " << output_tensor2.get_shape() << std::endl;
+    auto output2 = output_tensor2.data<int32_t>();
+    for (int ind = 0; ind < output_tensor2.get_size(); ++ind) {
+        std::cout << output2[ind] << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "output_tensor3 get_shape = " << output_tensor3.get_shape() << std::endl;
+    auto output3 = output_tensor3.data<int32_t>();
+    for (int ind = 0; ind < output_tensor3.get_size(); ++ind) {
+        std::cout << output3[ind] << " ";
+    }
+    std::cout << std::endl;
+
+    /*
+Parameter_42
+i32
+Parameter_43
+i32
+Parameter_44
+u8
+    */
+    //ov::Tensor input_tensor1 = ov::Tensor(input_type, input_shape, input_data.get());
+
+    //infer_request.set_input_tensor()
+    //infer_request.get_tensor("");
+
+    // auto output1 =
+    // input_model->get_place_by_operation_name_and_output_port("StatefulPartitionedCall/text_preprocessor/RaggedToSparse/RaggedTensorToSparse",
+    // 0); auto output2 =
+    // input_model->get_place_by_operation_name_and_output_port("StatefulPartitionedCall/text_preprocessor/RaggedToSparse/RaggedTensorToSparse",
+    // 1); auto output3 =
+    // input_model->get_place_by_operation_name_and_output_port("StatefulPartitionedCall/text_preprocessor/RaggedToSparse/RaggedTensorToSparse",
+    // 2);
+    int a = 2;
+    // FrontEnd::Ptr frontEnd;
+    // InputModel::Ptr inputModel;
+
+    /*
     std::shared_ptr<StatisticsReport> statistics;
     try {
         ov::CompiledModel compiledModel;
@@ -298,7 +450,6 @@ int main(int argc, char* argv[]) {
             is_load_config = true;
         }
 
-        /** This vector stores paths to the processed images with input names**/
         auto inputFiles = parse_input_arguments(gflags::GetArgvs());
 
         // ----------------- 2. Loading the OpenVINO Runtime
@@ -1160,9 +1311,6 @@ int main(int argc, char* argv[]) {
         auto startTime = Time::now();
         auto execTime = std::chrono::duration_cast<ns>(Time::now() - startTime).count();
 
-        /** Start inference & calculate performance **/
-        /** to align number if iterations to guarantee that last infer requests are
-         * executed in the same conditions **/
         while ((niter != 0LL && iteration < niter) ||
                (duration_nanoseconds != 0LL && (uint64_t)execTime < duration_nanoseconds) ||
                (FLAGS_api == "async" && iteration % nireq != 0)) {
@@ -1350,6 +1498,6 @@ int main(int argc, char* argv[]) {
 
         return 3;
     }
-
+    */
     return 0;
 }

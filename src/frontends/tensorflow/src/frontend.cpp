@@ -231,6 +231,7 @@ void FrontEnd::normalize(const std::shared_ptr<ov::Model>& function) const {
     manager.register_pass<pass::EmbeddingSegmentSingleFeatureFusion>();
     manager.register_pass<pass::BlockLSTMReplacer>();
     manager.register_pass<pass::GRUBlockCellReplacer>();
+    /*
     manager.set_per_pass_validation(true);
     // manager.register_pass<ov::pass::GraphRewrite>(std::make_shared<pass::StructuralTypeProp>());
     // manager.register_pass<ov::pass::GraphRewrite>(std::make_shared<pass::ReplaceStrByU81D>());
@@ -245,7 +246,7 @@ void FrontEnd::normalize(const std::shared_ptr<ov::Model>& function) const {
     manager.register_pass<pass::DecomposeStructResults>();
 
     manager.set_per_pass_validation(false);
-
+    */
     // TODO: reimplement TransposeSinking that does not corrupt filters for Convolution
     manager.register_pass<ov::frontend::tensorflow::pass::TransposeSinking>();
     manager.register_pass<ov::pass::ReverseShapeAndTypeInfer>();
