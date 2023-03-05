@@ -46,7 +46,7 @@ public:
         // Handle validation model and evaluatation mode due to CPU bug (see other ops)
 
         // TODO: Move to cpp file
-
+        /*
         if (all_inputs_are_constants(this)) {
             ov::TensorVector inputs;
             for (size_t i = 0; i < get_input_size(); ++i) {
@@ -66,7 +66,7 @@ public:
             set_output_type(2, element::i32, Shape{2});
             return;
         }
-
+        */
         set_output_type(0, element::i32, PartialShape{Dimension(), Dimension(2)});
         set_output_type(1, element::i32, PartialShape{Dimension()});
         set_output_type(2, element::i32, PartialShape{Dimension()});
@@ -146,8 +146,11 @@ public:
         std::vector<int32_t> m_sparse_values_i32(m_sparse_values.begin(), m_sparse_values.end());
         std::vector<int32_t> m_sparse_dense_shape_i32(m_sparse_dense_shape.begin(), m_sparse_dense_shape.end());
 
+        outputs[0].set_shape({m_sparse_indices_i32.size() / 2, 2});
         memcpy(outputs[0].data(), m_sparse_indices_i32.data(), sizeof(int32_t) * m_sparse_indices_i32.size());
+        outputs[1].set_shape({m_sparse_values_i32.size()});
         memcpy(outputs[1].data(), m_sparse_values_i32.data(), sizeof(int32_t) * m_sparse_values_i32.size());
+        outputs[2].set_shape({2});
         memcpy(outputs[2].data(), m_sparse_dense_shape_i32.data(), sizeof(int32_t) * m_sparse_dense_shape_i32.size());
         return true;
     }

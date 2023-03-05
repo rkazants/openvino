@@ -177,9 +177,9 @@ void setDeviceProperty(ov::Core& core,
         return;
 
     if (device_config.find(device) == device_config.end() ||  // device properties not existed
-        config.first.empty() &&                               // not setting default value to property
-            (!FLAGS_load_config.empty() &&
-             is_dev_set_property[device])) {  // device properties loaded from file and overwrite is not happened
+        (config.first.empty() &&                              // not setting default value to property
+         (!FLAGS_load_config.empty() &&
+          is_dev_set_property[device]))) {  // device properties loaded from file and overwrite is not happened
         is_dev_set_property[device] = false;
         device_config.erase(device);
         device_config.insert(ov::device::properties(device, device_property));
@@ -207,7 +207,7 @@ void fuse_mean_scale(ov::preprocess::PrePostProcessor& preproc, const benchmark_
     bool warned = false;
     constexpr char warn_msg[] = "Mean/scale values are fused into the model. This slows down performance compared to "
                                 "--imean and --iscale which existed before";
-    for (const std::pair<std::string, benchmark_app::InputInfo>& input_info : app_inputs_info) {
+    for (const std::pair<std::string, benchmark_app::InputInfo> input_info : app_inputs_info) {
         if (!input_info.second.mean.empty()) {
             if (!warned) {
                 slog::warn << warn_msg << slog::endl;
@@ -266,17 +266,18 @@ int main(int argc, char* argv[]) {
 
 
     //std::string model_path = "C:\\Users\\rkazants\\Intel\\cvs_tickets\\conversion_with_fw_nodes\\facenet.pb";
-    std::string model_path = "C:\\Users\\rkazants\\Intel\\cvs_tickets\\conversion_with_fw_nodes\\JDCOM\\9000_109ms.pb";
+    //std::string model_path = "C:\\Users\\rkazants\\Intel\\cvs_tickets\\conversion_with_fw_nodes\\JDCOM\\9000_109ms.pb";
 
     //std::string model_path = "C:\\Users\\rkazants\\Intel\\cvs_tickets\\CVS-55594_deepfm\\model\\deepfm.pb";
     //auto input_model = frontEnd->load(model_path);
     
-    //std::string model_path = "C:\\Users\\rkazants\\Intel\\cvs_issues\\universal-sentence-encoder-multilingual_"
-    //                        "3\\universal-sentence-encoder-multilingual_3.pb";
+    
+    std::string model_path = "C:\\Users\\rkazants\\Intel\\cvs_issues\\universal-sentence-encoder-multilingual_"
+                            "3\\universal-sentence-encoder-multilingual_3.pb";
 
     
     auto input_model = frontEnd->load(model_path);
-
+    /*
     // --input input_images[1 32 244 1],seq_len[1],output_keep_prob->[1.0],input_keep_prob->[1.0]
     auto input1_place = input_model->get_place_by_tensor_name("input_images:0");
     auto input2_place = input_model->get_place_by_tensor_name("seq_len:0");
@@ -295,8 +296,8 @@ int main(int argc, char* argv[]) {
     input_model->set_partial_shape(input4_place, ov::PartialShape{1});
     input_model->set_element_type(input4_place, ov::element::f32);
     input_model->set_tensor_value(input4_place, std::vector<float>{1.0}.data());
+    */
 
-    /*
     auto output1_place = input_model->get_place_by_tensor_name(
         "StatefulPartitionedCall/text_preprocessor/RaggedToSparse/RaggedTensorToSparse:0");
     auto output2_place = input_model->get_place_by_tensor_name(
@@ -304,7 +305,6 @@ int main(int argc, char* argv[]) {
     auto output3_place = input_model->get_place_by_tensor_name(
         "StatefulPartitionedCall/text_preprocessor/RaggedToSparse/RaggedTensorToSparse:2");
     input_model->override_all_outputs({output1_place, output2_place, output3_place});
-    */
     
     auto ov_model = frontEnd->convert(input_model);
     //auto ov_model = frontEnd->convert_partially(input_model);
@@ -757,11 +757,14 @@ u8
                 device_nstreams.erase(device);
             }
         }
-
-        for (auto&& item : config) {
-            core.set_property(item.first, item.second);
-        }
-
+        auto result = std::find_if(config.begin(), config.end(), [&](const std::pair<std::string, ov::AnyMap>& item) {
+            if (device_name.find(item.first) == 0)
+                return true;
+            return false;
+        });
+        ov::AnyMap device_config = {};
+        if (result != config.end())
+            device_config = result->second;
         size_t batchSize = FLAGS_b;
         ov::element::Type type = ov::element::undefined;
         std::string topology_name = "";
@@ -793,7 +796,7 @@ u8
             next_step();
             slog::info << "Skipping the step for loading model from file" << slog::endl;
             auto startTime = Time::now();
-            compiledModel = core.compile_model(FLAGS_m, device_name);
+            compiledModel = core.compile_model(FLAGS_m, device_name, device_config);
             auto duration_ms = get_duration_ms_till_now(startTime);
             slog::info << "Compile model took " << double_to_string(duration_ms) << " ms" << slog::endl;
             slog::info << "Original model I/O parameters:" << slog::endl;
@@ -837,7 +840,7 @@ u8
 
             const auto& inputInfo = std::const_pointer_cast<const ov::Model>(model)->inputs();
             if (inputInfo.empty()) {
-                throw std::logic_error("no inputs info is provided");
+                throw std::logic_error("No inputs info is provided");
             }
 
             // ----------------- 5. Resizing network to match image sizes and given
@@ -893,7 +896,7 @@ u8
             const auto output_precision = FLAGS_op.empty() ? ov::element::undefined : getPrecision2(FLAGS_op);
 
             const auto& inputs = model->inputs();
-            for (int i = 0; i < inputs.size(); i++) {
+            for (size_t i = 0; i < inputs.size(); i++) {
                 const auto& item = inputs[i];
                 auto iop_precision = ov::element::undefined;
                 auto type_to_set = ov::element::undefined;
@@ -934,7 +937,7 @@ u8
             fuse_mean_scale(preproc, app_inputs_info.at(0));
 
             const auto& outs = model->outputs();
-            for (int i = 0; i < outs.size(); i++) {
+            for (size_t i = 0; i < outs.size(); i++) {
                 const auto& item = outs[i];
                 auto iop_precision = ov::element::undefined;
                 try {
@@ -972,7 +975,7 @@ u8
             // --------------------------------------------------------
             next_step();
             startTime = Time::now();
-            compiledModel = core.compile_model(model, device_name);
+            compiledModel = core.compile_model(model, device_name, device_config);
             duration_ms = get_duration_ms_till_now(startTime);
             slog::info << "Compile model took " << double_to_string(duration_ms) << " ms" << slog::endl;
             if (statistics)
@@ -1363,7 +1366,7 @@ u8
         std::vector<LatencyMetrics> groupLatencies = {};
         if (FLAGS_pcseq && app_inputs_info.size() > 1) {
             const auto& lat_groups = inferRequestsQueue.get_latency_groups();
-            for (int i = 0; i < lat_groups.size(); i++) {
+            for (size_t i = 0; i < lat_groups.size(); i++) {
                 const auto& lats = lat_groups[i];
 
                 std::string data_shapes_string = "";

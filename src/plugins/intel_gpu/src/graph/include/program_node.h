@@ -9,8 +9,8 @@
 #include "intel_gpu/primitives/implementation_desc.hpp"
 #include "intel_gpu/graph/program.hpp"
 
-#include "kernel_selector_helper.h"
 #include "fused_primitive_desc.h"
+#include "kernel_impl_params.hpp"
 #include "meta_utils.h"
 
 #include <set>
@@ -71,7 +71,7 @@ struct program_node {
 public:
     virtual const primitive_id& id() const { return desc->id; }
     virtual primitive_type_id type() const { return desc->type; }
-    virtual std::shared_ptr<kernel_selector::fuse_params> get_fuse_params() const { return nullptr; }
+    virtual std::shared_ptr<NodeFuseParams> get_fuse_params() const { return nullptr; }
     virtual bool generates_dynamic_output() const { return false; }
 
     virtual std::vector<size_t> get_shape_infer_dependencies() const {
@@ -81,6 +81,22 @@ public:
         std::vector<size_t> res(get_dependencies().size());
         std::iota(std::begin(res), std::end(res), 0);
         return res;
+    }
+
+    bool is_shape_infer_dep(void) const {
+        if (!myprog.get_config().get_property(ov::intel_gpu::allow_new_shape_infer))
+            return false;
+        for (auto u : users) {
+            for (auto dep_idx : u->get_shape_infer_dependencies()) {
+                if (u->get_dependencies().size() <= dep_idx) {
+                    continue;
+                }
+                if (u->get_dependency(dep_idx).get_unique_id() == unique_id) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     std::map<size_t, memory::ptr> get_const_memory_deps() const;
