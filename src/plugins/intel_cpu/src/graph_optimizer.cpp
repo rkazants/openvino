@@ -324,7 +324,7 @@ void GraphOptimizer::FuseConvolutionMatMulDeconvAndBias(Graph& graph) {
     auto& graphNodes = graph.GetNodes();
 
     auto isSuitableParentNode = [](const NodePtr& node) {
-        const auto deconv = std::dynamic_pointer_cast<Deconvolution>(node);
+        const auto deconv = ov::as_type_ptr<Deconvolution>(node);
         // bias should be the first child
         if (!node->getFusedWith().empty()) {
             return false;
@@ -500,7 +500,7 @@ void GraphOptimizer::FuseDeconvolutionAndSimpleOperation(Graph& graph) {
         if (node->getType() != Type::Deconvolution || node->getChildEdges().size() != 1) {
             return false;
         }
-        const auto deconv = std::dynamic_pointer_cast<Deconvolution>(node);
+        const auto deconv = ov::as_type_ptr<Deconvolution>(node);
         if (deconv == nullptr) {
             OPENVINO_THROW("Cannot cast to deconvolution node ", node->getName());
         }
@@ -888,9 +888,9 @@ void GraphOptimizer::FuseFCAndTransposeOnWeights(Graph& graph) {
     for (const auto& parent : graphNodes) {
         if (isSuitablePattern(parent)) {
             CPU_GRAPH_OPTIMIZER_SCOPE(FuseFCAndTransposeOnWeights);
-            auto fcNode = std::dynamic_pointer_cast<FullyConnected>(parent->getChildEdgeAt(0)->getChild());
+            auto fcNode = ov::as_type_ptr<FullyConnected>(parent->getChildEdgeAt(0)->getChild());
             fcNode->keepWeightsNonTransposed(true);
-            auto transposeNode = std::dynamic_pointer_cast<Transpose>(parent);
+            auto transposeNode = ov::as_type_ptr<Transpose>(parent);
             transposeNode->setOptimized(true);
         }
     }
@@ -902,7 +902,7 @@ void GraphOptimizer::FuseConvolutionAndZeroPoints(Graph& graph) {
     auto isSuitableConvNode = [](const NodePtr& node) {
         bool retVal = false;
         if (node->getType() == Type::Convolution) {
-            if (auto convNode = std::dynamic_pointer_cast<Convolution>(node)) {
+            if (auto convNode = ov::as_type_ptr<Convolution>(node)) {
                 auto rank = convNode->getInputShapeAtPort(0).getRank();
                 // int8 depthwise convolution does not support fusing zero points in 3D case
                 if (implication(convNode->isDepthWise(), rank < 5)) {
@@ -1198,7 +1198,7 @@ void GraphOptimizer::FuseConvolutionAndDWConvolution(Graph& graph) {
             return false;
         }
 
-        const auto conv = std::dynamic_pointer_cast<Convolution>(node);
+        const auto conv = ov::as_type_ptr<Convolution>(node);
         if (conv == nullptr) {
             OPENVINO_THROW("Cannot cast to convolution node ", node->getName());
         }
@@ -1239,12 +1239,12 @@ void GraphOptimizer::FuseConvolutionAndDWConvolution(Graph& graph) {
             return false;
         }
 
-        const auto convChild = std::dynamic_pointer_cast<Convolution>(childNode);
+        const auto convChild = ov::as_type_ptr<Convolution>(childNode);
         if (convChild == nullptr) {
             OPENVINO_THROW("Cannot cast to convolution node ", childNode->getName());
         }
 
-        const auto convParent = std::dynamic_pointer_cast<Convolution>(parentNode);
+        const auto convParent = ov::as_type_ptr<Convolution>(parentNode);
         if (convParent == nullptr) {
             OPENVINO_THROW("Cannot cast to convolution node ", parentNode->getName());
         }
@@ -1313,7 +1313,7 @@ void GraphOptimizer::FuseConvolutionAndDWConvolution(Graph& graph) {
         int dw_conv_input_size = inDims[0] * inDims[1] * inDims[2] * inDims[3] * elemSize;
         int dw_conv_output_size = outDims[0] * outDims[1] * outDims[2] * outDims[3] * elemSize;
 
-        auto parentConvolutionNode = std::dynamic_pointer_cast<Convolution>(parentNode);
+        auto parentConvolutionNode = ov::as_type_ptr<Convolution>(parentNode);
         if (parentConvolutionNode == nullptr) {
             OPENVINO_THROW("Cannot get convolution node ", parentNode->getName());
         }
@@ -1591,7 +1591,7 @@ void GraphOptimizer::FuseConvolutionSumAndConvolutionSumActivation(Graph& graph)
     };
 
     for (auto& graphNode : graphNodes) {
-        const auto eltwiseNode = std::dynamic_pointer_cast<Eltwise>(graphNode);
+        const auto eltwiseNode = ov::as_type_ptr<Eltwise>(graphNode);
         if (graphNode->getType() != Type::Eltwise || graphNode->getAlgorithm() != Algorithm::EltwiseAdd ||
             !eltwiseNode || eltwiseNode->isWithBroadcast()) {
             continue;
@@ -1622,7 +1622,7 @@ void GraphOptimizer::FuseConvolutionSumAndConvolutionSumActivation(Graph& graph)
 
             if (fuseCandidate->getAlgorithm() == Algorithm::EltwiseAdd) {
                 for (auto& fusedNode : binConv->fusedWith) {
-                    const auto eltwise = std::dynamic_pointer_cast<Eltwise>(fusedNode);
+                    const auto eltwise = ov::as_type_ptr<Eltwise>(fusedNode);
                     if (eltwise && eltwise->isSpecialConvolutionAddFusing()) {
                         return false;
                     }
@@ -1644,7 +1644,7 @@ void GraphOptimizer::FuseConvolutionSumAndConvolutionSumActivation(Graph& graph)
 
         auto checkFusedWithSum = [](Convolution* conv) -> bool {
             for (const auto& node : conv->getFusedWith()) {
-                const auto eltwise = std::dynamic_pointer_cast<Eltwise>(node);
+                const auto eltwise = ov::as_type_ptr<Eltwise>(node);
                 if (eltwise && eltwise->isSpecialConvolutionAddFusing()) {
                     return true;
                 }
@@ -2415,14 +2415,14 @@ void GraphOptimizer::FusePerformedAsScaleShiftAndFakeQuantize(Graph& graph) {
     };
 
     auto fuseScaleShiftAndFakeQuantizeNodes = [getNonConstPort](const NodePtr& parent, const NodePtr& child) {
-        auto fakeQuantizeNode = std::dynamic_pointer_cast<FakeQuantize>(child);
+        auto fakeQuantizeNode = ov::as_type_ptr<FakeQuantize>(child);
         if (fakeQuantizeNode == nullptr) {
             OPENVINO_THROW("Cannot cast ", child->getName(), " to FakeQuantize node");
         }
 
         std::vector<float> scalesBuffer;
         std::vector<float> shiftsBuffer;
-        auto parentEltwise = std::dynamic_pointer_cast<Eltwise>(parent);
+        auto parentEltwise = ov::as_type_ptr<Eltwise>(parent);
         if (!parentEltwise) {
             OPENVINO_THROW("Cannot cast ", parent->getName(), " to Eltwise node");
         }
@@ -2771,7 +2771,7 @@ void GraphOptimizer::MergeTransposeAndReorder(Graph& graph) {
             if (parent->getType() == Type::Convolution) {
                 for (const auto& fusedNode : parent->getFusedWith()) {
                     if (fusedNode->getAlgorithm() == Algorithm::EltwiseAdd) {
-                        const auto addNode = std::dynamic_pointer_cast<Eltwise>(fusedNode);
+                        const auto addNode = ov::as_type_ptr<Eltwise>(fusedNode);
                         if (addNode && addNode->isSpecialConvolutionAddFusing()) {
                             return true;
                         }
@@ -2882,10 +2882,9 @@ void GraphOptimizer::MergeTransposeAndReorder(Graph& graph) {
 
         CPU_GRAPH_OPTIMIZER_SCOPE(MergeTransposeAndReorder_ChildNode);
 
-        const auto transposeNode = std::dynamic_pointer_cast<Transpose>(parentNode);
-        const auto reorderNode = std::dynamic_pointer_cast<Reorder>(childNode);
-        std::shared_ptr<Reshape> reshapeNode =
-            intermNode != nullptr ? std::dynamic_pointer_cast<Reshape>(intermNode) : nullptr;
+        const auto transposeNode = ov::as_type_ptr<Transpose>(parentNode);
+        const auto reorderNode = ov::as_type_ptr<Reorder>(childNode);
+        std::shared_ptr<Reshape> reshapeNode = intermNode != nullptr ? ov::as_type_ptr<Reshape>(intermNode) : nullptr;
         if (!transposeNode || !reorderNode || (intermNode && !reshapeNode)) {
             continue;
         }
@@ -3012,10 +3011,9 @@ void GraphOptimizer::MergeReorderAndTranspose(Graph& graph) {
 
         CPU_GRAPH_OPTIMIZER_SCOPE(MergeTransposeAndReorder_ChildNode);
 
-        auto transposeNode = std::dynamic_pointer_cast<Transpose>(childNode);
-        auto reorderNode = std::dynamic_pointer_cast<Reorder>(parentNode);
-        std::shared_ptr<Reshape> reshapeNode =
-            intermNode != nullptr ? std::dynamic_pointer_cast<Reshape>(intermNode) : nullptr;
+        auto transposeNode = ov::as_type_ptr<Transpose>(childNode);
+        auto reorderNode = ov::as_type_ptr<Reorder>(parentNode);
+        std::shared_ptr<Reshape> reshapeNode = intermNode != nullptr ? ov::as_type_ptr<Reshape>(intermNode) : nullptr;
         if (!transposeNode || !reorderNode || (intermNode && !reshapeNode)) {
             continue;
         }

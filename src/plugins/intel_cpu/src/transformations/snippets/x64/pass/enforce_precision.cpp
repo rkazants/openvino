@@ -109,7 +109,7 @@ bool EnforcePrecision::run_on_model(const std::shared_ptr<ov::Model>& f) {
             }
         }
 
-        auto type_relaxed_node = std::dynamic_pointer_cast<ov::op::TypeRelaxedBase>(op);
+        auto type_relaxed_node = ov::as_type_ptr<ov::op::TypeRelaxedBase>(op);
         if (was_updated || (type_relaxed_node != nullptr)) {
             const bool res = snippets::pass::PropagatePrecision::validate_and_infer_types_and_restore_outputs(op);
             was_updated = was_updated || res;

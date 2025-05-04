@@ -65,7 +65,7 @@ public:
         inputs.push_back(inp1);
 
         auto itr = std::find_if(opList.begin(), opList.end(), [](const NodePtr& node) {
-            if (auto eltwise = std::dynamic_pointer_cast<Eltwise>(node)) {
+            if (auto eltwise = ov::as_type_ptr<Eltwise>(node)) {
                 return eltwise->isSpecialConvolutionAddFusing();
             }
             return false;
@@ -425,7 +425,7 @@ std::tuple<ov::element::Type, ov::element::Type> Convolution::getDstAndSumPrecis
             continue;
         }
 
-        if (auto eltwiseNode = std::dynamic_pointer_cast<Eltwise>(node)) {
+        if (auto eltwiseNode = ov::as_type_ptr<Eltwise>(node)) {
             if (!eltwiseNode->isSpecialConvolutionAddFusing()) {
                 continue;
             }
@@ -732,7 +732,7 @@ void Convolution::executeDynamicImpl(const dnnl::stream& strm) {
 void Convolution::addFusedNode(const NodePtr& fusingNode) {
     if (Type::Eltwise == fusingNode->getType()) {
         if (fusingNode->getAlgorithm() == Algorithm::EltwiseAdd) {
-            auto eltwiseNode = std::dynamic_pointer_cast<Eltwise>(fusingNode);
+            auto eltwiseNode = ov::as_type_ptr<Eltwise>(fusingNode);
             if (eltwiseNode && eltwiseNode->isSpecialConvolutionAddFusing()) {
                 withSum = true;
             }
@@ -749,7 +749,7 @@ void Convolution::addFusedNode(const NodePtr& fusingNode) {
     }
 
     if (fusingNode->getType() == Type::Convolution) {
-        auto convolutionNode = std::dynamic_pointer_cast<Convolution>(fusingNode);
+        auto convolutionNode = ov::as_type_ptr<Convolution>(fusingNode);
         CPU_NODE_ASSERT(convolutionNode, "Unexpected dynamic node type");
         withDWConv = true;
         auto& inActivationDims = convolutionNode->inputShapes[0].getStaticDims();
