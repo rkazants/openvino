@@ -1,3 +1,4 @@
+#include <iostream>
 // Copyright (C) 2018-2026 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -83,7 +84,7 @@ void OtdPerfCounters::dump() const {
     const auto misses = gpu_misses.load(std::memory_order_relaxed);
     const auto total = hits + misses;
     const auto loads = tensor_load_count.load(std::memory_order_relaxed);
-    GPU_DEBUG_INFO << "[OTD_PERF] gpu_hits=" << hits << ", gpu_misses=" << misses << ", gpu_hit_rate=" << (total > 0 ? 100.0 * hits / total : 0.0) << "%"
+    std::cerr << "[OTD_PERF] gpu_hits=" << hits << ", gpu_misses=" << misses << ", gpu_hit_rate=" << (total > 0 ? 100.0 * hits / total : 0.0) << "%"
                    << ", tensor_loads=" << loads << ", avg_disk_io_us=" << (loads > 0 ? disk_io_ns.load(std::memory_order_relaxed) / 1000 / loads : 0)
                    << ", avg_gpu_copy_us=" << (loads > 0 ? gpu_copy_ns.load(std::memory_order_relaxed) / 1000 / loads : 0)
                    << ", total_disk_io_ms=" << disk_io_ns.load(std::memory_order_relaxed) / 1000000

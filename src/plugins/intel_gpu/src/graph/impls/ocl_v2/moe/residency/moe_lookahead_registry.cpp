@@ -1,6 +1,8 @@
 #include "impls/ocl_v2/primitive_ocl_base.hpp"
 #include "moe_lookahead_registry.hpp"
 #include <limits>
+#include <iostream>
+#include <cstdlib>
 
 namespace ov::intel_gpu::ocl::moe {
 
@@ -29,6 +31,13 @@ void LookaheadContext::pause_for_prefill() {
 void LookaheadContext::build_once(cldnn::network& network) {
     std::call_once(m_init_flag, [&] {
         m_links = network.get_program()->get_les_router_links();
+        if (std::getenv("MOE_OTD_PERF_LOG")) {  // DIAG
+            for (const auto& link : m_links) {
+                std::cerr << "LES_DIAG link " << link.chain.source_moe << " -> " << link.chain.target_moe << " status=" << static_cast<int>(link.status)
+                          << " chain_status=" << static_cast<int>(link.chain.status) << " reason=" << link.rejection_reason << std::endl;
+            }
+            std::cerr << "LES_DIAG links=" << m_links.size() << std::endl;
+        }
         for (const auto& id : network.get_executed_primitive_ids()) {
             auto instance = network.get_primitive(id);
             if (instance->type() == cldnn::moe_3gemm_fused_compressed::type_id()) {
@@ -44,11 +53,11 @@ void LookaheadContext::build_once(cldnn::network& network) {
                            << static_cast<int>(link.chain.status) << " router=" << static_cast<int>(link.status) << " " << link.rejection_reason
                            << std::endl;
         }
-        const auto& predictor_path = network.get_config().get_les_predictor();
+        const auto& predictor = network.get_config().get_les_predictor();
         std::optional<LesPredictorModel> predictor_model;
-        if (!predictor_path.empty()) {
+        if (predictor) {
             // The predictor replaces the next-layer router, so only the plain chain topology is required.
-            predictor_model = load_les_predictor_model(predictor_path);
+            predictor_model = load_les_predictor_model(predictor);
             m_links.clear();
             for (const auto& chain : network.get_program()->get_les_moe_links()) {
                 const auto target = m_layer_indices.find(chain.target_moe);
@@ -107,6 +116,10 @@ void LookaheadContext::build_once(cldnn::network& network) {
             m_predictor = std::make_unique<LesPredictor>(network, *predictor_model);
             GPU_DEBUG_INFO << "LES predictor: " << m_predictor->head_count() << " heads, " << m_predictor_layers.size()
                            << " MoE layers mapped, top_k " << m_predictor->top_k() << std::endl;
+            if (std::getenv("MOE_OTD_PERF_LOG")) {  // DIAG
+                std::cerr << "LES_DIAG predictor: " << m_predictor->head_count() << " heads, " << m_predictor_layers.size()
+                          << " MoE layers mapped, top_k " << m_predictor->top_k() << std::endl;
+            }
         }
     });
 }
@@ -164,6 +177,10 @@ void LookaheadContext::predict(const LookaheadLayerDesc& next_layer,
     auto& state = m_predictions[target];
     if (state.consumed && !state.consumed->load(std::memory_order_acquire)) {
         return;
+    }
+    static std::atomic<uint64_t> diag_predictions{0};  // DIAG
+    if (std::getenv("MOE_OTD_PERF_LOG") && (++diag_predictions % 1000) == 1) {
+        std::cerr << "LES_DIAG predictions=" << diag_predictions.load() << (predictor_head(target) ? " (predictor)" : " (router)") << std::endl;
     }
     auto result = [&] {
         if (auto* head = predictor_head(target)) {
@@ -224,6 +241,10 @@ void LookaheadContext::prefetch(const cldnn::primitive_inst* current_moe) {
     const auto& link = m_links.at(m_source_links.at(current_moe->id()));
     if (!weights || weights->resident_capacity() <= link.top_k) {
         return;
+    }
+    static std::atomic<uint64_t> diag_prefetches{0};  // DIAG
+    if (std::getenv("MOE_OTD_PERF_LOG") && (++diag_prefetches % 1000) == 1) {
+        std::cerr << "LES_DIAG prefetch_submits=" << diag_prefetches.load() << std::endl;
     }
     state.submitted = true;
     state.consumed->store(false, std::memory_order_release);
